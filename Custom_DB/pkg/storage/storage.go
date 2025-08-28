@@ -1,11 +1,14 @@
 package storage
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
-	"io"
+
 	"os"
 	"path/filepath"
+	"reflect"
+
 	"sync"
 )
 
@@ -19,8 +22,12 @@ type TableFile struct {
 }
 
 func NewTableFile(dbPath, tableName string) (*TableFile, error) {
-
 	path := filepath.Join(dbPath, fmt.Sprintf("%s.dat", tableName))
+
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create directory for table file %s: %w", dir, err)
+	}
 
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		file, err := os.Create(path)
@@ -62,22 +69,125 @@ func (tf *TableFile) ReadAllRows() ([]Row, error) {
 
 	file, err := os.OpenFile(tf.path, os.O_RDONLY, 0644)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return []Row{}, nil
+		}
 		return nil, fmt.Errorf("failed to open file %s for reading: %w", tf.path, err)
 	}
 	defer file.Close()
 
 	rows := []Row{}
-	decoder := json.NewDecoder(file)
+	scanner := bufio.NewScanner(file)
 
-	for {
+	for scanner.Scan() {
+		line := scanner.Bytes()
 		var row Row
-		if err := decoder.Decode(&row); err == io.EOF {
-			break
-		} else if err != nil {
-			return nil, fmt.Errorf("failed to decode JSON from file %s: %w", tf.path, err)
+		if err := json.Unmarshal(line, &row); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Failed to decode JSON row from file %s: %s\n", tf.path, err)
+			continue
 		}
 		rows = append(rows, row)
 	}
 
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("error reading file %s: %w", tf.path, err)
+	}
+
 	return rows, nil
+}
+
+func (tf *TableFile) UpdateRows(whereCol string, whereVal interface{}, setCol string, setVal interface{}) (int, error) {
+	tf.mu.Lock()
+	defer tf.mu.Unlock()
+
+	originalRows, err := tf.ReadAllRows()
+	if err != nil {
+		return 0, fmt.Errorf("failed to read rows for update: %w", err)
+	}
+
+	updatedCount := 0
+	newRows := make([]Row, 0, len(originalRows))
+
+	for _, row := range originalRows {
+		if val, ok := row[whereCol]; ok && reflect.DeepEqual(val, whereVal) {
+			row[setCol] = setVal
+			updatedCount++
+		}
+		newRows = append(newRows, row)
+	}
+
+	if err := tf.rewriteFile(newRows); err != nil {
+		return 0, fmt.Errorf("failed to rewrite file after update: %w", err)
+	}
+
+	return updatedCount, nil
+}
+
+func (tf *TableFile) DeleteRows(whereCol string, whereVal interface{}) (int, error) {
+	tf.mu.Lock()
+	defer tf.mu.Unlock()
+
+	originalRows, err := tf.ReadAllRows()
+	if err != nil {
+		return 0, fmt.Errorf("failed to read rows for delete: %w", err)
+	}
+
+	deletedCount := 0
+	newRows := make([]Row, 0, len(originalRows))
+
+	for _, row := range originalRows {
+		if val, ok := row[whereCol]; !(ok && reflect.DeepEqual(val, whereVal)) {
+			newRows = append(newRows, row)
+		} else {
+			deletedCount++
+		}
+	}
+
+	if err := tf.rewriteFile(newRows); err != nil {
+		return 0, fmt.Errorf("failed to rewrite file after delete: %w", err)
+	}
+
+	return deletedCount, nil
+}
+
+func (tf *TableFile) rewriteFile(rows []Row) error {
+	tmpPath := tf.path + ".tmp"
+	tmpFile, err := os.Create(tmpPath)
+	if err != nil {
+		return fmt.Errorf("failed to create temporary file for rewrite: %w", err)
+	}
+	defer tmpFile.Close()
+	defer os.Remove(tmpPath)
+
+	for _, row := range rows {
+		data, err := json.Marshal(row)
+		if err != nil {
+			return fmt.Errorf("failed to marshal row to JSON during rewrite: %w", err)
+		}
+		if _, err := tmpFile.WriteString(string(data) + "\n"); err != nil {
+			return fmt.Errorf("failed to write row to temporary file during rewrite: %w", err)
+		}
+	}
+
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("failed to close temporary file: %w", err)
+	}
+
+	if err := os.Rename(tmpPath, tf.path); err != nil {
+		return fmt.Errorf("failed to replace original file with temporary file: %w", err)
+	}
+	return nil
+}
+
+func (tf *TableFile) DeleteFile() error {
+	tf.mu.Lock()
+	defer tf.mu.Unlock()
+
+	if err := os.Remove(tf.path); err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to delete table data file %s: %w", tf.path, err)
+	}
+	return nil
 }

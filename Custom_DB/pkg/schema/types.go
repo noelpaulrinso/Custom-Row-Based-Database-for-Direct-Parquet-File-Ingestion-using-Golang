@@ -50,25 +50,19 @@ func NewDatabase(dbPath string) (*Database, error) {
 	if err != nil {
 		if os.IsNotExist(err) {
 			return db, db.Save()
-
 		}
-
-		return nil, fmt.Errorf("failed to read the schema file %s: %w", fullPath, err)
-
+		return nil, fmt.Errorf("failed to read schema file %s: %w", fullPath, err)
 	}
 
-	if err := json.Unmarshal(data, &db.Tables); err != nil {
-		return nil, fmt.Errorf("failed to Unmarshal the data from %s: %w", fullPath, err)
+	var loadedTables map[string]Table
+	if err := json.Unmarshal(data, &loadedTables); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal schema data from %s: %w", fullPath, err)
 	}
-
+	db.Tables = loadedTables
 	return db, nil
-
 }
 
 func (db *Database) Save() error {
-	db.mu.Lock()
-	defer db.mu.Unlock()
-
 	data, err := json.MarshalIndent(db.Tables, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal schema to JSON: %w", err)
@@ -119,6 +113,10 @@ func (db *Database) GetAllTableNames() []string {
 		names = append(names, name)
 	}
 	return names
+}
+
+func (db *Database) GetDBPath() string {
+	return db.dbPath
 }
 
 func ValidateColumnType(typeStr string) bool {

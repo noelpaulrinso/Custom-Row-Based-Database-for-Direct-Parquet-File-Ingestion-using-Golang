@@ -1,0 +1,36 @@
+{
+  "college": {
+    "name": "college",
+    "columns": [
+      {
+        "name": "id",
+        "type": "INT"
+      },
+      {
+        "name": "name",
+        "type": "TEXT"
+      },
+      {
+        "name": "price",
+        "type": "DECIMAL"
+      }
+    ]
+  },
+  "products": {
+    "name": "products",
+    "columns": [
+      {
+        "name": "id",
+        "type": "INT"
+      },
+      {
+        "name": "name",
+        "type": "TEXT"
+      },
+      {
+        "name": "price",
+        "type": "DECIMAL"
+      }
+    ]
+  }
+}
