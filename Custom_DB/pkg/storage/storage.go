@@ -94,24 +94,26 @@ func (tf *TableFile) readAllRowsNoLock() ([]Row, error) {
 }
 
 // --- Helper: normalize values for comparison ---
-func normalize(val interface{}) interface{} {
+
+// Enhanced normalization: returns value, and also string representation for fallback comparison
+func normalize(val interface{}) (interface{}, string) {
 	switch v := val.(type) {
 	case string:
 		// try int
 		if i, err := strconv.Atoi(v); err == nil {
-			return i
+			return i, v
 		}
 		// try float
 		if f, err := strconv.ParseFloat(v, 64); err == nil {
-			return f
+			return f, v
 		}
 		// try bool
 		if b, err := strconv.ParseBool(v); err == nil {
-			return b
+			return b, v
 		}
-		return v
+		return v, v
 	default:
-		return v
+		return v, fmt.Sprintf("%v", v)
 	}
 }
 
@@ -125,12 +127,15 @@ func (tf *TableFile) UpdateRows(whereCol string, whereVal interface{}, setCol st
 	}
 
 	updatedCount := 0
-	whereValNorm := normalize(whereVal)
+	whereValNorm, whereValStr := normalize(whereVal)
 
 	for _, row := range rows {
-		if val, ok := row[whereCol]; ok && reflect.DeepEqual(normalize(val), whereValNorm) {
-			row[setCol] = setVal
-			updatedCount++
+		if val, ok := row[whereCol]; ok {
+			valNorm, valStr := normalize(val)
+			if reflect.DeepEqual(valNorm, whereValNorm) || valStr == whereValStr {
+				row[setCol] = setVal
+				updatedCount++
+			}
 		}
 	}
 
@@ -151,14 +156,17 @@ func (tf *TableFile) DeleteRows(whereCol string, whereVal interface{}) (int, err
 
 	deletedCount := 0
 	newRows := make([]Row, 0, len(rows))
-	whereValNorm := normalize(whereVal)
+	whereValNorm, whereValStr := normalize(whereVal)
 
 	for _, row := range rows {
-		if val, ok := row[whereCol]; !(ok && reflect.DeepEqual(normalize(val), whereValNorm)) {
-			newRows = append(newRows, row)
-		} else {
-			deletedCount++
+		if val, ok := row[whereCol]; ok {
+			valNorm, valStr := normalize(val)
+			if reflect.DeepEqual(valNorm, whereValNorm) || valStr == whereValStr {
+				deletedCount++
+				continue
+			}
 		}
+		newRows = append(newRows, row)
 	}
 
 	if err := tf.rewriteFile(newRows); err != nil {

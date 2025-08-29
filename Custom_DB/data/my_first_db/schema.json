@@ -1,21 +1,4 @@
 {
-  "college": {
-    "name": "college",
-    "columns": [
-      {
-        "name": "id",
-        "type": "INT"
-      },
-      {
-        "name": "name",
-        "type": "TEXT"
-      },
-      {
-        "name": "price",
-        "type": "DECIMAL"
-      }
-    ]
-  },
   "students": {
     "name": "students",
     "columns": [
@@ -33,8 +16,8 @@
       }
     ]
   },
-  "users": {
-    "name": "users",
+  "teacher": {
+    "name": "teacher",
     "columns": [
       {
         "name": "id",
@@ -43,10 +26,6 @@
       {
         "name": "name",
         "type": "TEXT"
-      },
-      {
-        "name": "age",
-        "type": "INT"
       }
     ]
   }

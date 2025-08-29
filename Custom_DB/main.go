@@ -17,6 +17,7 @@ func main() {
 	fmt.Println("Type 'exit' or 'quit' to leave the shell.")
 	fmt.Println("")
 	fmt.Println("")
+	fmt.Println("")
 	fmt.Println("  /$$$$$$                        /$$                                   /$$$$$$$  /$$$$$$$")
 	fmt.Println(" /$$__  $$                      | $$                                  | $$__  $$| $$__  $$")
 	fmt.Println("| $$       /$$   /$$  /$$$$$$$ /$$$$$$    /$$$$$$  /$$$$$$/$$$$       | $$    $$| $$    $$")
@@ -353,24 +354,26 @@ func main() {
 			}
 
 		case "DELETE":
-			fullCommand := strings.Join(parts, " ")
-			fromClauseStart := strings.Index(fullCommand, " FROM ")
-			whereClauseStart := strings.Index(fullCommand, " WHERE ")
+			// Make DELETE command parsing more robust and case-insensitive
+			// Accepts: DELETE FROM table WHERE col = value;
+			fullCommand := strings.TrimSpace(input)
+			upperFull := strings.ToUpper(fullCommand)
+			fromIdx := strings.Index(upperFull, " FROM ")
+			whereIdx := strings.Index(upperFull, " WHERE ")
 
-			if fromClauseStart == -1 || whereClauseStart == -1 || whereClauseStart < fromClauseStart {
+			if fromIdx == -1 || whereIdx == -1 || whereIdx < fromIdx {
 				fmt.Println("Invalid DELETE syntax. Example: DELETE FROM users WHERE id = 1;")
 				continue
 			}
 
-			tableName := strings.TrimSpace(fullCommand[fromClauseStart+len(" FROM ") : whereClauseStart])
+			tableName := strings.TrimSpace(fullCommand[fromIdx+len(" FROM ") : whereIdx])
 			table, exists := db.GetTable(tableName)
 			if !exists {
 				fmt.Printf("Table '%s' does not exist.\n", tableName)
 				continue
 			}
 
-			whereClause := fullCommand[whereClauseStart+len(" WHERE "):]
-
+			whereClause := fullCommand[whereIdx+len(" WHERE "):]
 			whereParts := strings.SplitN(whereClause, "=", 2)
 			if len(whereParts) != 2 {
 				fmt.Println("Invalid WHERE clause in DELETE. Only simple equality supported for now.")
