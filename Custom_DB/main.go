@@ -12,8 +12,11 @@ import (
 )
 
 func main() {
+	fmt.Println("LOADING ###################################################################################################################################")
 	fmt.Println("Welcome to CustomDB!")
 	fmt.Println("Type 'exit' or 'quit' to leave the shell.")
+	fmt.Println("")
+	fmt.Println("")
 	fmt.Println("  /$$$$$$                        /$$                                   /$$$$$$$  /$$$$$$$")
 	fmt.Println(" /$$__  $$                      | $$                                  | $$__  $$| $$__  $$")
 	fmt.Println("| $$       /$$   /$$  /$$$$$$$ /$$$$$$    /$$$$$$  /$$$$$$/$$$$       | $$    $$| $$    $$")
@@ -22,6 +25,12 @@ func main() {
 	fmt.Println("| $$    $$| $$  | $$  ____  $$  | $$ /$$| $$  | $$| $$ | $$ | $$      | $$  | $$| $$    $$")
 	fmt.Println("|  $$$$$$/|  $$$$$$/ /$$$$$$$/  |  $$$$/|  $$$$$$/| $$ | $$ | $$      | $$$$$$$/| $$$$$$$/")
 	fmt.Println("   _____/   ______/ |_______/     ___/    ______/ |__/ |__/ |__/      |_______/ |_______/ ")
+	fmt.Println("")
+	fmt.Println("")
+	fmt.Println("")
+	fmt.Println("")
+	fmt.Println("")
+	fmt.Println("")
 
 	dbPath := "data/my_first_db"
 	db, err := schema.NewDatabase(dbPath)

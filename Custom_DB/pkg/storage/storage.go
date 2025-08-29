@@ -4,16 +4,14 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-
 	"os"
 	"path/filepath"
 	"reflect"
-
+	"strconv"
 	"sync"
 )
 
 type RowID int
-
 type Row map[string]interface{}
 
 type TableFile struct {
@@ -66,7 +64,10 @@ func (tf *TableFile) AppendRow(row Row) error {
 func (tf *TableFile) ReadAllRows() ([]Row, error) {
 	tf.mu.RLock()
 	defer tf.mu.RUnlock()
+	return tf.readAllRowsNoLock()
+}
 
+func (tf *TableFile) readAllRowsNoLock() ([]Row, error) {
 	file, err := os.OpenFile(tf.path, os.O_RDONLY, 0644)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -78,48 +79,64 @@ func (tf *TableFile) ReadAllRows() ([]Row, error) {
 
 	rows := []Row{}
 	scanner := bufio.NewScanner(file)
-
 	for scanner.Scan() {
-		line := scanner.Bytes()
 		var row Row
-		if err := json.Unmarshal(line, &row); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: Failed to decode JSON row from file %s: %s\n", tf.path, err)
-			continue
+		if err := json.Unmarshal(scanner.Bytes(), &row); err == nil {
+			rows = append(rows, row)
+		} else {
+			fmt.Fprintf(os.Stderr, "Warning: Failed to decode JSON row from %s: %s\n", tf.path, err)
 		}
-		rows = append(rows, row)
 	}
-
 	if err := scanner.Err(); err != nil {
 		return nil, fmt.Errorf("error reading file %s: %w", tf.path, err)
 	}
-
 	return rows, nil
+}
+
+// --- Helper: normalize values for comparison ---
+func normalize(val interface{}) interface{} {
+	switch v := val.(type) {
+	case string:
+		// try int
+		if i, err := strconv.Atoi(v); err == nil {
+			return i
+		}
+		// try float
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			return f
+		}
+		// try bool
+		if b, err := strconv.ParseBool(v); err == nil {
+			return b
+		}
+		return v
+	default:
+		return v
+	}
 }
 
 func (tf *TableFile) UpdateRows(whereCol string, whereVal interface{}, setCol string, setVal interface{}) (int, error) {
 	tf.mu.Lock()
 	defer tf.mu.Unlock()
 
-	originalRows, err := tf.ReadAllRows()
+	rows, err := tf.readAllRowsNoLock()
 	if err != nil {
 		return 0, fmt.Errorf("failed to read rows for update: %w", err)
 	}
 
 	updatedCount := 0
-	newRows := make([]Row, 0, len(originalRows))
+	whereValNorm := normalize(whereVal)
 
-	for _, row := range originalRows {
-		if val, ok := row[whereCol]; ok && reflect.DeepEqual(val, whereVal) {
+	for _, row := range rows {
+		if val, ok := row[whereCol]; ok && reflect.DeepEqual(normalize(val), whereValNorm) {
 			row[setCol] = setVal
 			updatedCount++
 		}
-		newRows = append(newRows, row)
 	}
 
-	if err := tf.rewriteFile(newRows); err != nil {
+	if err := tf.rewriteFile(rows); err != nil {
 		return 0, fmt.Errorf("failed to rewrite file after update: %w", err)
 	}
-
 	return updatedCount, nil
 }
 
@@ -127,16 +144,17 @@ func (tf *TableFile) DeleteRows(whereCol string, whereVal interface{}) (int, err
 	tf.mu.Lock()
 	defer tf.mu.Unlock()
 
-	originalRows, err := tf.ReadAllRows()
+	rows, err := tf.readAllRowsNoLock()
 	if err != nil {
 		return 0, fmt.Errorf("failed to read rows for delete: %w", err)
 	}
 
 	deletedCount := 0
-	newRows := make([]Row, 0, len(originalRows))
+	newRows := make([]Row, 0, len(rows))
+	whereValNorm := normalize(whereVal)
 
-	for _, row := range originalRows {
-		if val, ok := row[whereCol]; !(ok && reflect.DeepEqual(val, whereVal)) {
+	for _, row := range rows {
+		if val, ok := row[whereCol]; !(ok && reflect.DeepEqual(normalize(val), whereValNorm)) {
 			newRows = append(newRows, row)
 		} else {
 			deletedCount++
@@ -146,7 +164,6 @@ func (tf *TableFile) DeleteRows(whereCol string, whereVal interface{}) (int, err
 	if err := tf.rewriteFile(newRows); err != nil {
 		return 0, fmt.Errorf("failed to rewrite file after delete: %w", err)
 	}
-
 	return deletedCount, nil
 }
 
@@ -172,7 +189,6 @@ func (tf *TableFile) rewriteFile(rows []Row) error {
 	if err := tmpFile.Close(); err != nil {
 		return fmt.Errorf("failed to close temporary file: %w", err)
 	}
-
 	if err := os.Rename(tmpPath, tf.path); err != nil {
 		return fmt.Errorf("failed to replace original file with temporary file: %w", err)
 	}
