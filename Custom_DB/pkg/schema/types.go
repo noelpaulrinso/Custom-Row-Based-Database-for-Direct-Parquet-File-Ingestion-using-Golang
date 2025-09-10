@@ -42,6 +42,7 @@ func NewDatabase(dbPath string) (*Database, error) {
 		schemaFilePath: fullPath,
 	}
 
+	
 	if err := os.MkdirAll(dbPath, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create database directory %s: %w", dbPath, err)
 	}

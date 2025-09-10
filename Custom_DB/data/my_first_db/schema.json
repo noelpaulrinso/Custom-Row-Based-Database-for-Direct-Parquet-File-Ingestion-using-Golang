@@ -1,4 +1,17 @@
 {
+  "emotions": {
+    "name": "emotions",
+    "columns": [
+      {
+        "name": "ID",
+        "type": "INT"
+      },
+      {
+        "name": "name",
+        "type": "TEXT"
+      }
+    ]
+  },
   "students": {
     "name": "students",
     "columns": [
