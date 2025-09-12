@@ -12,6 +12,92 @@
       }
     ]
   },
+  "iris": {
+    "name": "iris",
+    "columns": [
+      {
+        "name": "duckdb_schema",
+        "type": "TEXT"
+      },
+      {
+        "name": "sepal.length",
+        "type": "TEXT"
+      },
+      {
+        "name": "sepal.width",
+        "type": "TEXT"
+      },
+      {
+        "name": "petal.length",
+        "type": "TEXT"
+      },
+      {
+        "name": "petal.width",
+        "type": "TEXT"
+      },
+      {
+        "name": "variety",
+        "type": "TEXT"
+      }
+    ]
+  },
+  "products-1000": {
+    "name": "products-1000",
+    "columns": [
+      {
+        "name": "Index",
+        "type": "TEXT"
+      },
+      {
+        "name": "Name",
+        "type": "TEXT"
+      },
+      {
+        "name": "Description",
+        "type": "TEXT"
+      },
+      {
+        "name": "Brand",
+        "type": "TEXT"
+      },
+      {
+        "name": "Category",
+        "type": "TEXT"
+      },
+      {
+        "name": "Price",
+        "type": "TEXT"
+      },
+      {
+        "name": "Currency",
+        "type": "TEXT"
+      },
+      {
+        "name": "Stock",
+        "type": "TEXT"
+      },
+      {
+        "name": "EAN",
+        "type": "TEXT"
+      },
+      {
+        "name": "Color",
+        "type": "TEXT"
+      },
+      {
+        "name": "Size",
+        "type": "TEXT"
+      },
+      {
+        "name": "Availability",
+        "type": "TEXT"
+      },
+      {
+        "name": "Internal ID",
+        "type": "TEXT"
+      }
+    ]
+  },
   "students": {
     "name": "students",
     "columns": [
@@ -38,6 +124,63 @@
       },
       {
         "name": "name",
+        "type": "TEXT"
+      }
+    ]
+  },
+  "titanic": {
+    "name": "titanic",
+    "columns": [
+      {
+        "name": "duckdb_schema",
+        "type": "TEXT"
+      },
+      {
+        "name": "PassengerId",
+        "type": "TEXT"
+      },
+      {
+        "name": "Survived",
+        "type": "TEXT"
+      },
+      {
+        "name": "Pclass",
+        "type": "TEXT"
+      },
+      {
+        "name": "Name",
+        "type": "TEXT"
+      },
+      {
+        "name": "Sex",
+        "type": "TEXT"
+      },
+      {
+        "name": "Age",
+        "type": "TEXT"
+      },
+      {
+        "name": "SibSp",
+        "type": "TEXT"
+      },
+      {
+        "name": "Parch",
+        "type": "TEXT"
+      },
+      {
+        "name": "Ticket",
+        "type": "TEXT"
+      },
+      {
+        "name": "Fare",
+        "type": "TEXT"
+      },
+      {
+        "name": "Cabin",
+        "type": "TEXT"
+      },
+      {
+        "name": "Embarked",
         "type": "TEXT"
       }
     ]

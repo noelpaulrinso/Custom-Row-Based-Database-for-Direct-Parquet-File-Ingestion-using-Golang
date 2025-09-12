@@ -4,11 +4,15 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
+	"Custom_DB/pkg/importer"
 	"Custom_DB/pkg/schema"
 	"Custom_DB/pkg/storage"
+
+	"github.com/ncruces/zenity"
 )
 
 func main() {
@@ -65,6 +69,40 @@ func main() {
 		command := strings.ToUpper(parts[0])
 
 		switch command {
+		case "IMPORT":
+			filePath, err := zenity.SelectFile(
+				zenity.Title("Select a CSV or Parquet file"),
+				zenity.FileFilter{
+					Name:     "Data files",
+					Patterns: []string{"*.csv", "*.parquet"},
+				},
+			)
+			if err != nil {
+				if err == zenity.ErrCanceled {
+					fmt.Println("Import cancelled.")
+				} else {
+					fmt.Printf("Error selecting file: %v\n", err)
+				}
+				continue
+			}
+
+			fmt.Printf("Selected file: %s\n", filePath)
+			ext := filepath.Ext(filePath)
+
+			var importErr error
+			if ext == ".csv" {
+				fmt.Println("Calling CSV importer...")
+				importErr = importer.ImportCSV(filePath, db)
+			} else if ext == ".parquet" {
+				fmt.Println("Calling Parquet importer...")
+				importErr = importer.ImportParquet(filePath, db)
+			} else {
+				fmt.Println("Unsupported file type.")
+			}
+
+			if importErr != nil {
+				fmt.Printf("Error during import: %v\n", importErr)
+			}
 		case "CREATE":
 			if len(parts) < 3 || strings.ToUpper(parts[1]) != "TABLE" {
 				fmt.Println("Invalid CREATE TABLE syntax. Example: CREATE TABLE users (id INT, name TEXT);")
@@ -407,7 +445,7 @@ func main() {
 			}
 
 		default:
-			fmt.Println("Unknown command. Supported commands: CREATE TABLE, INSERT INTO, SELECT, SHOW TABLES, DROP TABLE, UPDATE, DELETE, EXIT.")
+			fmt.Println("Unknown command. Supported commands: CREATE TABLE, INSERT INTO, SELECT, SHOW TABLES, DROP TABLE, UPDATE, DELETE, IMPORT, EXIT.")
 		}
 	}
 }
