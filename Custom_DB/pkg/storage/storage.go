@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -20,6 +21,10 @@ type TableFile struct {
 }
 
 func NewTableFile(dbPath, tableName string) (*TableFile, error) {
+	if dbPath == "" || tableName == "" {
+		return nil, fmt.Errorf("invalid parameters: dbPath and tableName cannot be empty")
+	}
+
 	path := filepath.Join(dbPath, fmt.Sprintf("%s.dat", tableName))
 
 	dir := filepath.Dir(path)
@@ -27,22 +32,33 @@ func NewTableFile(dbPath, tableName string) (*TableFile, error) {
 		return nil, fmt.Errorf("failed to create directory for table file %s: %w", dir, err)
 	}
 
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		file, err := os.Create(path)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create data file %s: %w", path, err)
-		}
-		file.Close()
-	} else if err != nil {
-		return nil, fmt.Errorf("error checking file existence %s: %w", path, err)
+	// Open with read/write, create if not exists
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0644)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create/open data file %s: %w", path, err)
 	}
+	defer file.Close()
 
-	return &TableFile{path: path}, nil
+	return &TableFile{
+		path: path,
+		mu:   sync.RWMutex{},
+	}, nil
 }
 
 func (tf *TableFile) AppendRow(row Row) error {
+	if row == nil {
+		return fmt.Errorf("cannot append nil row")
+	}
+
 	tf.mu.Lock()
 	defer tf.mu.Unlock()
+
+	// Validate row data
+	for col, val := range row {
+		if val == nil {
+			row[col] = "NULL" // Convert nil to "NULL" string
+		}
+	}
 
 	file, err := os.OpenFile(tf.path, os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
@@ -55,9 +71,16 @@ func (tf *TableFile) AppendRow(row Row) error {
 		return fmt.Errorf("failed to marshal row to JSON: %w", err)
 	}
 
-	if _, err := file.WriteString(string(data) + "\n"); err != nil {
-		return fmt.Errorf("failed to write row to file %s: %w", tf.path, err)
+	// Use buffered writer for better performance
+	writer := bufio.NewWriter(file)
+	if _, err := writer.WriteString(string(data) + "\n"); err != nil {
+		return fmt.Errorf("failed to write row to buffer for file %s: %w", tf.path, err)
 	}
+
+	if err := writer.Flush(); err != nil {
+		return fmt.Errorf("failed to flush row to file %s: %w", tf.path, err)
+	}
+
 	return nil
 }
 
@@ -97,8 +120,17 @@ func (tf *TableFile) readAllRowsNoLock() ([]Row, error) {
 
 // Enhanced normalization: returns value, and also string representation for fallback comparison
 func normalize(val interface{}) (interface{}, string) {
+	if val == nil {
+		return nil, ""
+	}
+
 	switch v := val.(type) {
 	case string:
+		v = strings.TrimSpace(v)
+		// Remove quotes if present
+		if len(v) >= 2 && v[0] == '\'' && v[len(v)-1] == '\'' {
+			v = v[1 : len(v)-1]
+		}
 		// try int
 		if i, err := strconv.Atoi(v); err == nil {
 			return i, v
@@ -112,6 +144,12 @@ func normalize(val interface{}) (interface{}, string) {
 			return b, v
 		}
 		return v, v
+	case int:
+		return v, fmt.Sprintf("%d", v)
+	case float64:
+		return v, fmt.Sprintf("%g", v)
+	case bool:
+		return v, fmt.Sprintf("%t", v)
 	default:
 		return v, fmt.Sprintf("%v", v)
 	}
@@ -146,9 +184,14 @@ func (tf *TableFile) UpdateRows(whereCol string, whereVal interface{}, setCol st
 }
 
 func (tf *TableFile) DeleteRows(whereCol string, whereVal interface{}) (int, error) {
+	if whereCol == "" {
+		return 0, fmt.Errorf("where column cannot be empty")
+	}
+
 	tf.mu.Lock()
 	defer tf.mu.Unlock()
 
+	// Read existing rows
 	rows, err := tf.readAllRowsNoLock()
 	if err != nil {
 		return 0, fmt.Errorf("failed to read rows for delete: %w", err)
@@ -158,6 +201,17 @@ func (tf *TableFile) DeleteRows(whereCol string, whereVal interface{}) (int, err
 	newRows := make([]Row, 0, len(rows))
 	whereValNorm, whereValStr := normalize(whereVal)
 
+	// Create temporary file
+	tmpPath := tf.path + ".tmp"
+	tmpFile, err := os.OpenFile(tmpPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create temporary file for delete operation: %w", err)
+	}
+	defer os.Remove(tmpPath) // Clean up in case of failure
+
+	writer := bufio.NewWriter(tmpFile)
+
+	// Process rows and write to temp file
 	for _, row := range rows {
 		if val, ok := row[whereCol]; ok {
 			valNorm, valStr := normalize(val)
@@ -166,40 +220,91 @@ func (tf *TableFile) DeleteRows(whereCol string, whereVal interface{}) (int, err
 				continue
 			}
 		}
+		// Keep this row
 		newRows = append(newRows, row)
+		data, err := json.Marshal(row)
+		if err != nil {
+			tmpFile.Close()
+			return 0, fmt.Errorf("failed to marshal row during delete: %w", err)
+		}
+		if _, err := writer.WriteString(string(data) + "\n"); err != nil {
+			tmpFile.Close()
+			return 0, fmt.Errorf("failed to write row during delete: %w", err)
+		}
 	}
 
-	if err := tf.rewriteFile(newRows); err != nil {
-		return 0, fmt.Errorf("failed to rewrite file after delete: %w", err)
+	// Ensure all data is written
+	if err := writer.Flush(); err != nil {
+		tmpFile.Close()
+		return 0, fmt.Errorf("failed to flush temporary file: %w", err)
 	}
+	tmpFile.Close()
+
+	// Atomic rename
+	if err := os.Rename(tmpPath, tf.path); err != nil {
+		return 0, fmt.Errorf("failed to replace original file with new data: %w", err)
+	}
+
 	return deletedCount, nil
 }
 
 func (tf *TableFile) rewriteFile(rows []Row) error {
+	if rows == nil {
+		return fmt.Errorf("rows slice cannot be nil")
+	}
+
 	tmpPath := tf.path + ".tmp"
-	tmpFile, err := os.Create(tmpPath)
+	tmpFile, err := os.OpenFile(tmpPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to create temporary file for rewrite: %w", err)
 	}
-	defer tmpFile.Close()
-	defer os.Remove(tmpPath)
+	defer func() {
+		tmpFile.Close()
+		// Only attempt to remove if the rename wasn't successful
+		if _, err := os.Stat(tmpPath); err == nil {
+			os.Remove(tmpPath)
+		}
+	}()
 
+	writer := bufio.NewWriter(tmpFile)
+
+	// Write all rows to the temporary file
 	for _, row := range rows {
+		// Validate row data
+		for col, val := range row {
+			if val == nil {
+				row[col] = "NULL"
+			}
+		}
+
 		data, err := json.Marshal(row)
 		if err != nil {
 			return fmt.Errorf("failed to marshal row to JSON during rewrite: %w", err)
 		}
-		if _, err := tmpFile.WriteString(string(data) + "\n"); err != nil {
+		if _, err := writer.WriteString(string(data) + "\n"); err != nil {
 			return fmt.Errorf("failed to write row to temporary file during rewrite: %w", err)
 		}
+	}
+
+	// Ensure all data is written
+	if err := writer.Flush(); err != nil {
+		return fmt.Errorf("failed to flush data to temporary file: %w", err)
+	}
+
+	// Ensure data is synced to disk
+	if err := tmpFile.Sync(); err != nil {
+		return fmt.Errorf("failed to sync temporary file to disk: %w", err)
 	}
 
 	if err := tmpFile.Close(); err != nil {
 		return fmt.Errorf("failed to close temporary file: %w", err)
 	}
+
+	// Atomic rename
 	if err := os.Rename(tmpPath, tf.path); err != nil {
 		return fmt.Errorf("failed to replace original file with temporary file: %w", err)
 	}
+
 	return nil
 }
 

@@ -3,10 +3,13 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
 
+	"Custom_DB/pkg/handlers"
+	"Custom_DB/pkg/parser"
 	"Custom_DB/pkg/schema"
 	"Custom_DB/pkg/storage"
 )
@@ -46,207 +49,42 @@ func main() {
 		fmt.Print("CustomDB> ")
 		input, err := reader.ReadString('\n')
 		if err != nil {
+			if err == io.EOF {
+				fmt.Println("Exiting CustomDB (EOF).")
+				break
+			}
 			fmt.Println("Error reading input:", err)
 			continue
 		}
 		input = strings.TrimSpace(input)
-
-		if strings.ToLower(input) == "exit" || strings.ToLower(input) == "quit" {
-			fmt.Println("Exiting CustomDB. Goodbye!")
-			break
-		}
-
 		input = strings.TrimSuffix(input, ";")
 
-		parts := strings.Split(strings.TrimSpace(input), " ")
-		if len(parts) == 0 {
+		cmd, perr := parser.Parse(input)
+		if perr != nil {
+			fmt.Println("Parse error:", perr)
 			continue
 		}
-		command := strings.ToUpper(parts[0])
+		command := cmd.Type
+		parts := cmd.Tokens
 
 		switch command {
-		case "CREATE":
-			if len(parts) < 3 || strings.ToUpper(parts[1]) != "TABLE" {
-				fmt.Println("Invalid CREATE TABLE syntax. Example: CREATE TABLE users (id INT, name TEXT);")
-				continue
-			}
-
-			tableDefIndex := 2
-			for i, part := range parts {
-				if strings.ToUpper(part) == "TABLE" {
-					tableDefIndex = i + 1
-					break
-				}
-			}
-			tableDef := strings.Join(parts[tableDefIndex:], " ")
-
-			tableNameEnd := strings.Index(tableDef, "(")
-			if tableNameEnd == -1 {
-				fmt.Println("Invalid CREATE TABLE syntax. Missing opening parenthesis.")
-				continue
-			}
-			tableName := strings.TrimSpace(tableDef[:tableNameEnd])
-
-			columnsStrEnd := strings.LastIndex(tableDef, ")")
-			if columnsStrEnd == -1 {
-				fmt.Println("Invalid CREATE TABLE syntax. Missing closing parenthesis.")
-				continue
-			}
-			columnsStr := tableDef[tableNameEnd+1 : columnsStrEnd]
-
-			columnDefs := strings.Split(columnsStr, ",")
-
-			table := schema.Table{
-				Name: tableName,
-			}
-			for _, colDef := range columnDefs {
-				colParts := strings.Fields(strings.TrimSpace(colDef))
-				if len(colParts) != 2 || !schema.ValidateColumnType(colParts[1]) {
-					fmt.Printf("Invalid column definition: '%s'. Expected format 'name TYPE'.\n", colDef)
-					continue
-				}
-				table.Columns = append(table.Columns, schema.Column{Name: colParts[0], Type: schema.DataType(colParts[1])})
-			}
-
-			if err := db.AddTable(table); err != nil {
-				fmt.Printf("Error creating table: %s\n", err)
+		case "SELECT":
+			out, err := handlers.HandleSelect(cmd, db)
+			if err != nil {
+				fmt.Println("SELECT error:", err)
 			} else {
-				fmt.Printf("Table '%s' created successfully.\n", tableName)
+				fmt.Print(out)
 			}
+			continue
 
 		case "INSERT":
-			if len(parts) < 3 || strings.ToUpper(parts[1]) != "INTO" {
-				fmt.Println("Invalid INSERT INTO syntax. Example: INSERT INTO users VALUES (1, 'Alice');")
-				continue
-			}
-
-			valuesStartIndex := 0
-			for i, part := range parts {
-				if strings.ToUpper(part) == "VALUES" {
-					valuesStartIndex = i
-					break
-				}
-			}
-			if valuesStartIndex == 0 {
-				fmt.Println("Invalid INSERT INTO syntax. VALUES clause not found.")
-				continue
-			}
-
-			tableName := strings.TrimSpace(parts[2])
-
-			table, exists := db.GetTable(tableName)
-			if !exists {
-				fmt.Printf("Table '%s' does not exist.\n", tableName)
-				continue
-			}
-
-			valuesStr := strings.Join(parts[valuesStartIndex+1:], " ")
-			valuesStart := strings.Index(valuesStr, "(")
-			valuesEnd := strings.LastIndex(valuesStr, ")")
-			if valuesStart == -1 || valuesEnd == -1 || valuesStart >= valuesEnd {
-				fmt.Println("Invalid INSERT INTO syntax. VALUES clause is malformed.")
-				continue
-			}
-
-			valueList := strings.Split(valuesStr[valuesStart+1:valuesEnd], ",")
-
-			if len(valueList) != len(table.Columns) {
-				fmt.Printf("Column count mismatch. Expected %d values, got %d.\n", len(table.Columns), len(valueList))
-				continue
-			}
-
-			row := make(storage.Row)
-			for i, valStr := range valueList {
-				colName := table.Columns[i].Name
-				trimmedVal := strings.TrimSpace(valStr)
-				switch table.Columns[i].Type {
-				case schema.Integer:
-					if intVal, err := strconv.Atoi(trimmedVal); err == nil {
-						row[colName] = intVal
-					} else {
-						fmt.Printf("Warning: Column '%s' expected INT, got '%s'. Storing as string.\n", colName, trimmedVal)
-						row[colName] = trimmedVal
-					}
-				case schema.Decimal:
-					if floatVal, err := strconv.ParseFloat(trimmedVal, 64); err == nil {
-						row[colName] = floatVal
-					} else {
-						fmt.Printf("Warning: Column '%s' expected DECIMAL, got '%s'. Storing as string.\n", colName, trimmedVal)
-						row[colName] = trimmedVal
-					}
-				case schema.Boolean:
-					if boolVal, err := strconv.ParseBool(trimmedVal); err == nil {
-						row[colName] = boolVal
-					} else {
-						fmt.Printf("Warning: Column '%s' expected BOOL, got '%s'. Storing as string.\n", colName, trimmedVal)
-						row[colName] = trimmedVal
-					}
-				case schema.Text:
-					if len(trimmedVal) > 1 && trimmedVal[0] == '\'' && trimmedVal[len(trimmedVal)-1] == '\'' {
-						row[colName] = trimmedVal[1 : len(trimmedVal)-1]
-					} else {
-						row[colName] = trimmedVal
-					}
-				default:
-					row[colName] = trimmedVal
-				}
-			}
-
-			tableFile, err := storage.NewTableFile(db.GetDBPath(), tableName)
+			out, err := handlers.HandleInsert(cmd, db)
 			if err != nil {
-				fmt.Printf("Error getting table file: %s\n", err)
-				continue
-			}
-
-			if err := tableFile.AppendRow(row); err != nil {
-				fmt.Printf("Error inserting row: %s\n", err)
+				fmt.Println("INSERT error:", err)
 			} else {
-				fmt.Println("Row inserted successfully.")
+				fmt.Println(out)
 			}
-
-		case "SELECT":
-			if len(parts) < 4 || strings.ToUpper(parts[1]) != "*" || strings.ToUpper(parts[2]) != "FROM" {
-				fmt.Println("Invalid SELECT syntax. Example: SELECT * FROM users;")
-				continue
-			}
-			tableName := strings.TrimSpace(parts[3])
-
-			table, exists := db.GetTable(tableName)
-			if !exists {
-				fmt.Printf("Table '%s' does not exist.\n", tableName)
-				continue
-			}
-
-			tableFile, err := storage.NewTableFile(db.GetDBPath(), tableName)
-			if err != nil {
-				fmt.Printf("Error getting table file: %s\n", err)
-				continue
-			}
-			rows, err := tableFile.ReadAllRows()
-			if err != nil {
-				fmt.Printf("Error reading rows: %s\n", err)
-				continue
-			}
-
-			header := ""
-			for _, col := range table.Columns {
-				header += fmt.Sprintf("%-20s", col.Name)
-			}
-			fmt.Println(header)
-			fmt.Println(strings.Repeat("-", len(header)))
-
-			for _, row := range rows {
-				rowStr := ""
-				for _, col := range table.Columns {
-					val, ok := row[col.Name]
-					if ok {
-						rowStr += fmt.Sprintf("%-20v", val)
-					} else {
-						rowStr += fmt.Sprintf("%-20s", "NULL")
-					}
-				}
-				fmt.Println(rowStr)
-			}
+			continue
 
 		case "SHOW":
 			if len(parts) > 1 && strings.ToUpper(parts[1]) == "TABLES" {
@@ -286,6 +124,9 @@ func main() {
 			fmt.Printf("Table '%s' dropped successfully.\n", tableName)
 
 		case "UPDATE":
+			// ... unchanged UPDATE implementation ...
+			// (kept as in your original code)
+			// ---
 			fullCommand := strings.Join(parts, " ")
 			setClauseStart := strings.Index(fullCommand, " SET ")
 			whereClauseStart := strings.Index(fullCommand, " WHERE ")
@@ -354,8 +195,7 @@ func main() {
 			}
 
 		case "DELETE":
-			// Make DELETE command parsing more robust and case-insensitive
-			// Accepts: DELETE FROM table WHERE col = value;
+			// ... unchanged DELETE implementation ...
 			fullCommand := strings.TrimSpace(input)
 			upperFull := strings.ToUpper(fullCommand)
 			fromIdx := strings.Index(upperFull, " FROM ")

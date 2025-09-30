@@ -1,13 +1,13 @@
 {
-  "emotions": {
-    "name": "emotions",
+  "noel": {
+    "name": "noel",
     "columns": [
       {
-        "name": "ID",
+        "name": "id",
         "type": "INT"
       },
       {
-        "name": "name",
+        "name": "characters",
         "type": "TEXT"
       }
     ]
@@ -39,6 +39,23 @@
       {
         "name": "name",
         "type": "TEXT"
+      }
+    ]
+  },
+  "users": {
+    "name": "users",
+    "columns": [
+      {
+        "name": "id",
+        "type": "INT"
+      },
+      {
+        "name": "name",
+        "type": "TEXT"
+      },
+      {
+        "name": "age",
+        "type": "INT"
       }
     ]
   }
