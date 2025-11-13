@@ -1,4 +1,21 @@
 {
+  "new": {
+    "name": "new",
+    "columns": [
+      {
+        "name": "id",
+        "type": "INT"
+      },
+      {
+        "name": "name",
+        "type": "TEXT"
+      },
+      {
+        "name": "photo",
+        "type": "IMAGE"
+      }
+    ]
+  },
   "noel": {
     "name": "noel",
     "columns": [
@@ -9,6 +26,23 @@
       {
         "name": "characters",
         "type": "TEXT"
+      }
+    ]
+  },
+  "photos": {
+    "name": "photos",
+    "columns": [
+      {
+        "name": "id",
+        "type": "INT"
+      },
+      {
+        "name": "title",
+        "type": "TEXT"
+      },
+      {
+        "name": "image_file",
+        "type": "IMAGE"
       }
     ]
   },

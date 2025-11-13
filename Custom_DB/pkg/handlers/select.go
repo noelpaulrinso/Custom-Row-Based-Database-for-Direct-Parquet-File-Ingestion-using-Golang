@@ -597,37 +597,6 @@ func HandleSelect(cmd parser.Command, db *schema.Database) (string, error) {
 	return sb.String(), nil
 }
 
-// helper functions copied/adapted from main.go but kept local to handlers package
-func getColumnDefinition(columns []schema.Column, colName string) (schema.Column, bool) {
-	for _, col := range columns {
-		if strings.EqualFold(col.Name, colName) {
-			return col, true
-		}
-	}
-	return schema.Column{}, false
-}
-
-func coerceValue(valStr string, targetType schema.DataType) (interface{}, error) {
-	trimmedVal := strings.TrimSpace(valStr)
-
-	if targetType == schema.Text && len(trimmedVal) > 1 && trimmedVal[0] == '\'' && trimmedVal[len(trimmedVal)-1] == '\'' {
-		trimmedVal = trimmedVal[1 : len(trimmedVal)-1]
-	}
-
-	switch targetType {
-	case schema.Integer:
-		return strconv.Atoi(trimmedVal)
-	case schema.Decimal:
-		return strconv.ParseFloat(trimmedVal, 64)
-	case schema.Boolean:
-		return strconv.ParseBool(trimmedVal)
-	case schema.Text:
-		return trimmedVal, nil
-	default:
-		return nil, fmt.Errorf("unsupported data type for coercion: %s", targetType)
-	}
-}
-
 // helper: parse numeric-like interface to float64
 func toFloat(v interface{}) (float64, bool) {
 	switch t := v.(type) {

@@ -15,6 +15,7 @@ const (
 	Text    DataType = "TEXT"
 	Decimal DataType = "DECIMAL"
 	Boolean DataType = "BOOL"
+	Image   DataType = "IMAGE"
 )
 
 type Column struct {
@@ -122,7 +123,7 @@ func (db *Database) GetDBPath() string {
 
 func ValidateColumnType(typeStr string) bool {
 	switch DataType(typeStr) {
-	case Integer, Text, Decimal, Boolean:
+	case Integer, Text, Decimal, Boolean, Image:
 		return true
 	default:
 		return false
