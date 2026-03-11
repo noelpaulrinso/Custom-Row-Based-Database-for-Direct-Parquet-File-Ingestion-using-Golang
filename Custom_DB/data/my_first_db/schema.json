@@ -1,4 +1,133 @@
 {
+  "banking": {
+    "name": "banking",
+    "columns": [
+      {
+        "name": "customer_id",
+        "type": "TEXT"
+      },
+      {
+        "name": "age",
+        "type": "TEXT"
+      },
+      {
+        "name": "gender",
+        "type": "TEXT"
+      },
+      {
+        "name": "marital_status",
+        "type": "TEXT"
+      },
+      {
+        "name": "education_level",
+        "type": "TEXT"
+      },
+      {
+        "name": "employment_status",
+        "type": "TEXT"
+      },
+      {
+        "name": "income",
+        "type": "TEXT"
+      },
+      {
+        "name": "account_balance",
+        "type": "TEXT"
+      },
+      {
+        "name": "savings_balance",
+        "type": "TEXT"
+      },
+      {
+        "name": "fixed_deposit",
+        "type": "TEXT"
+      },
+      {
+        "name": "credit_score",
+        "type": "TEXT"
+      },
+      {
+        "name": "loan_amount",
+        "type": "TEXT"
+      },
+      {
+        "name": "loan_type",
+        "type": "TEXT"
+      },
+      {
+        "name": "default_flag",
+        "type": "TEXT"
+      },
+      {
+        "name": "transaction_count",
+        "type": "TEXT"
+      },
+      {
+        "name": "avg_monthly_spend",
+        "type": "TEXT"
+      },
+      {
+        "name": "has_credit_card",
+        "type": "TEXT"
+      },
+      {
+        "name": "credit_card_limit",
+        "type": "TEXT"
+      },
+      {
+        "name": "branch",
+        "type": "TEXT"
+      },
+      {
+        "name": "years_as_customer",
+        "type": "TEXT"
+      },
+      {
+        "name": "mobile_banking_active",
+        "type": "TEXT"
+      },
+      {
+        "name": "internet_banking_active",
+        "type": "TEXT"
+      },
+      {
+        "name": "fraud_flag",
+        "type": "TEXT"
+      },
+      {
+        "name": "account_start_date",
+        "type": "TEXT"
+      },
+      {
+        "name": "last_transaction_date",
+        "type": "TEXT"
+      },
+      {
+        "name": "risk_score",
+        "type": "TEXT"
+      },
+      {
+        "name": "customer_segment",
+        "type": "TEXT"
+      },
+      {
+        "name": "account_type",
+        "type": "TEXT"
+      },
+      {
+        "name": "kyc_status",
+        "type": "TEXT"
+      },
+      {
+        "name": "salary_account_flag",
+        "type": "TEXT"
+      },
+      {
+        "name": "complaint_count",
+        "type": "TEXT"
+      }
+    ]
+  },
   "new": {
     "name": "new",
     "columns": [

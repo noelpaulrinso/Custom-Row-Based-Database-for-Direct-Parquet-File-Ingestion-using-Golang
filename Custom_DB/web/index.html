@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CustomDB</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="app-shell">
+
+        <!-- ── Conversations sidebar (left) ────────────────── -->
+        <nav class="conv-panel" id="conv-panel">
+            <div class="conv-panel-header">
+                <span class="conv-panel-logo">Custom<span class="logo-accent">DB</span></span>
+                <button class="btn-new-chat" onclick="newConversation()" title="New chat">＋ New Chat</button>
+            </div>
+            <div class="conv-list" id="conv-list">
+                <div class="conv-list-empty">No conversations yet</div>
+            </div>
+            <div class="conv-panel-footer">
+                <button class="conv-footer-btn" onclick="openImportDialog()">⬆ Import Data</button>
+                <button class="conv-footer-btn" onclick="toggleDbInfo()">⬡ DB Info</button>
+            </div>
+        </nav>
+
+        <!-- ── Main area ────────────────────────────────────── -->
+        <div class="main-area">
+
+            <!-- Header -->
+            <header class="header">
+                <div class="header-left">
+                    <button class="sidebar-toggle" onclick="toggleConvPanel()" title="Toggle conversations">☰</button>
+                    <span class="header-conv-title" id="header-conv-title">CustomDB</span>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-import" onclick="openImportDialog()">Import Data</button>
+                    <button class="btn btn-secondary btn-small" onclick="toggleDbInfo()">Info</button>
+                </div>
+            </header>
+
+            <!-- Chat area -->
+            <main class="chat-section">
+                <div class="chat-container" id="chat-container">
+                    <div class="welcome-message">
+                        <div class="welcome-icon">⬡</div>
+                        <h2>CustomDB Interface</h2>
+                        <p>Run SQL queries or describe what you need in plain English.</p>
+                        <div class="example-chips">
+                            <button class="chip" onclick="sendMessage('SHOW TABLES;')">SHOW TABLES</button>
+                            <button class="chip" onclick="sendMessage('SELECT * FROM Image;')">SELECT * FROM Image</button>
+                            <button class="chip" onclick="sendMessage('SELECT COUNT(*) FROM Image;')">COUNT(*) FROM Image</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chat-input-container">
+                    <div class="input-wrapper">
+                        <textarea
+                            id="chat-input"
+                            placeholder="Enter SQL or ask in plain English…"
+                            rows="1"
+                            onkeydown="handleKeyPress(event)"
+                        ></textarea>
+                        <button class="send-btn" onclick="sendChatMessage()" title="Send (Ctrl+Enter)">&#10148;</button>
+                    </div>
+                    <div class="input-footer">
+                        <label class="mode-toggle">
+                            <input type="checkbox" id="ai-mode" onchange="toggleMode()">
+                            <span id="mode-label">SQL Mode</span>
+                        </label>
+                        <span class="hint">Ctrl+Enter to send</span>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- ── DB Info sidebar (right, slide-in) ───────────── -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h3>Database Info</h3>
+                <button class="close-btn" onclick="toggleDbInfo()">✕</button>
+            </div>
+            <div class="sidebar-section">
+                <h4>Tables</h4>
+                <div id="tables-list" class="tables-list">
+                    <div class="loading">Loading tables…</div>
+                </div>
+                <button class="btn btn-secondary btn-small" onclick="refreshTables()">Refresh</button>
+            </div>
+            <div class="sidebar-section">
+                <h4>Quick Actions</h4>
+                <div class="quick-actions">
+                    <button class="action-btn" onclick="sendMessage('SHOW TABLES;')">SHOW TABLES</button>
+                    <button class="action-btn" onclick="buildSelectQuery()">SELECT from Table</button>
+                </div>
+            </div>
+            <div class="sidebar-section">
+                <h4>Settings</h4>
+                <div class="settings-group">
+                    <label for="image-dir">Image Directory</label>
+                    <input type="text" id="image-dir" placeholder="/path/to/images">
+                    <button class="btn btn-secondary btn-small" onclick="setImageDir()">Set</button>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Hidden file picker -->
+    <input type="file" id="file-picker" accept=".csv,.parquet" style="display:none" onchange="onFileSelected(this)">
+
+    <!-- Import Dialog -->
+    <div id="import-dialog" class="modal">
+        <div class="modal-content" style="max-width:460px;">
+            <div class="modal-header">
+                <h2>Import File</h2>
+                <button class="close-btn" onclick="closeImportDialog()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div id="import-file-info" class="file-info-bar" style="display:none;"></div>
+                <div class="form-group">
+                    <label for="table-name">Table Name</label>
+                    <input type="text" id="table-name" placeholder="e.g., my_table">
+                </div>
+                <div style="display:flex;gap:0.6rem;justify-content:flex-end;margin-top:0.25rem;">
+                    <button class="btn btn-secondary" onclick="closeImportDialog()">Cancel</button>
+                    <button class="btn btn-primary" id="import-confirm-btn" onclick="confirmImport()">Import</button>
+                </div>
+                <div style="margin:1.5rem 0;border-top:1px solid var(--border);"></div>
+                <h3 style="font-size:0.88rem;font-weight:600;color:var(--text-muted);margin-bottom:0.85rem;">Or run Quick SQL</h3>
+                <textarea
+                    id="import-sql"
+                    placeholder="CREATE TABLE users (id INT, name TEXT);&#10;INSERT INTO users VALUES (1, 'Alice');"
+                    rows="5"
+                    style="width:100%;padding:0.6rem 0.85rem;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:'Courier New',monospace;font-size:0.82rem;resize:vertical;color:var(--text);background:var(--bg);"
+                ></textarea>
+                <button class="btn btn-primary btn-small" style="margin-top:0.6rem;" onclick="importSQL()">Execute SQL</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rename dialog -->
+    <div id="rename-dialog" class="modal">
+        <div class="modal-content" style="max-width:380px;">
+            <div class="modal-header">
+                <h2>Rename Chat</h2>
+                <button class="close-btn" onclick="closeRenameDialog()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="rename-input">Title</label>
+                    <input type="text" id="rename-input" placeholder="Chat title" onkeydown="if(event.key==='Enter') confirmRename()">
+                </div>
+                <div style="display:flex;gap:0.6rem;justify-content:flex-end;margin-top:0.5rem;">
+                    <button class="btn btn-secondary" onclick="closeRenameDialog()">Cancel</button>
+                    <button class="btn btn-primary" onclick="confirmRename()">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="toast"></div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

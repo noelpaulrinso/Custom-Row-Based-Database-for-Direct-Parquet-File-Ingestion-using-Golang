@@ -1,0 +1,20 @@
+{
+  "id": "1773242426605",
+  "title": "show me all the student data",
+  "createdAt": "2026-03-11T20:50:26+05:30",
+  "updatedAt": "2026-03-11T20:50:35+05:30",
+  "messages": [
+    {
+      "role": "user",
+      "text": "show me all the student data",
+      "timestamp": "2026-03-11T20:50:35+05:30"
+    },
+    {
+      "role": "bot",
+      "text": "",
+      "sql": "SELECT * FROM students;",
+      "result": "id                  name                course              \n------------------------------------------------------------\n1                   Noel                Mech                \n2                   Abel                AI/ML               \n3                   Benedict            Data Science        \n4                   Eve                 CS                  \n5                   Dan                 EE                  \n6                   Frank               Mech                \nNULL                sam                 data science        \n",
+      "timestamp": "2026-03-11T20:50:35+05:30"
+    }
+  ]
+}

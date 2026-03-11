@@ -308,6 +308,13 @@ func (tf *TableFile) rewriteFile(rows []Row) error {
 	return nil
 }
 
+// RewriteFile is a public wrapper for rewriteFile
+func (tf *TableFile) RewriteFile(rows []Row) error {
+	tf.mu.Lock()
+	defer tf.mu.Unlock()
+	return tf.rewriteFile(rows)
+}
+
 func (tf *TableFile) DeleteFile() error {
 	tf.mu.Lock()
 	defer tf.mu.Unlock()

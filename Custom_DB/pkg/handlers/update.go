@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 
@@ -27,18 +26,18 @@ func HandleUpdate(cmd parser.Command, db *schema.Database) (string, error) {
 
 	// Reconstruct full command for easier parsing
 	fullCommand := strings.Join(tokens, " ")
-	
+
 	// Find SET and WHERE clauses
 	setIndex := strings.Index(strings.ToUpper(fullCommand), " SET ")
 	whereIndex := strings.Index(strings.ToUpper(fullCommand), " WHERE ")
-	
+
 	if setIndex == -1 {
 		return "", fmt.Errorf("missing SET clause in UPDATE statement")
 	}
 
 	var setPart, wherePart string
 	if whereIndex != -1 {
-		setPart = strings.TrimSpace(fullCommand[setIndex+5:whereIndex])
+		setPart = strings.TrimSpace(fullCommand[setIndex+5 : whereIndex])
 		wherePart = strings.TrimSpace(fullCommand[whereIndex+7:])
 	} else {
 		setPart = strings.TrimSpace(fullCommand[setIndex+5:])
@@ -86,7 +85,7 @@ func HandleUpdate(cmd parser.Command, db *schema.Database) (string, error) {
 	// Update matching rows
 	for i, row := range rows {
 		shouldUpdate := true
-		
+
 		// Apply WHERE clause if present
 		if wherePart != "" {
 			shouldUpdate = evaluateWhereClause(wherePart, row, table.Columns)
@@ -99,7 +98,7 @@ func HandleUpdate(cmd parser.Command, db *schema.Database) (string, error) {
 	}
 
 	// Rewrite the entire file with updated data
-	if err := rewriteTableFile(tableFile, rows); err != nil {
+	if err := tableFile.RewriteFile(rows); err != nil {
 		return "", fmt.Errorf("error saving updated data: %s", err)
 	}
 
@@ -124,29 +123,6 @@ func evaluateWhereClause(whereClause string, row storage.Row, columns []schema.C
 		}
 	}
 	return false
-}
-
-// Rewrite table file with new rows
-func rewriteTableFile(tableFile *storage.TableFile, rows []storage.Row) error {
-	// Get the file path from the table file (need to access private field)
-	// Since we can't access private fields, we'll use a workaround:
-	// Delete the file and recreate it with new data
-	
-	// First, let's try to get the path by creating a temporary file
-	tmpTableFile, err := storage.NewTableFile("", "temp_update")
-	if err == nil {
-		// This won't work as expected, so let's implement a different approach
-	}
-	
-	// For now, we'll append all rows as new rows (this is not ideal but will work)
-	// In a production system, you'd want to implement a proper rewrite method
-	for _, row := range rows {
-		if err := tableFile.AppendRow(row); err != nil {
-			return err
-		}
-	}
-	
-	return nil
 }
 
 // Helper function to coerce value to correct type (avoiding duplicate with insert.go)

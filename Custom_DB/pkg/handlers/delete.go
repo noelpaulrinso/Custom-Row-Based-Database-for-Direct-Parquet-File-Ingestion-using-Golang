@@ -25,7 +25,7 @@ func HandleDelete(cmd parser.Command, db *schema.Database) (string, error) {
 	// Parse DELETE FROM ... WHERE ...
 	fullCommand := strings.Join(tokens, " ")
 	whereIndex := strings.Index(strings.ToUpper(fullCommand), " WHERE ")
-	
+
 	var wherePart string
 	if whereIndex != -1 {
 		wherePart = strings.TrimSpace(fullCommand[whereIndex+7:])
@@ -45,12 +45,12 @@ func HandleDelete(cmd parser.Command, db *schema.Database) (string, error) {
 	}
 
 	// Filter out rows that match the WHERE clause
-	var remainingRows [][]interface{}
+	var remainingRows []storage.Row
 	deletedCount := 0
 
 	for _, row := range rows {
 		shouldDelete := evaluateWhereClauseDelete(wherePart, row, table.Columns)
-		
+
 		if shouldDelete {
 			deletedCount++
 		} else {
@@ -59,7 +59,7 @@ func HandleDelete(cmd parser.Command, db *schema.Database) (string, error) {
 	}
 
 	// Save remaining data
-	if err := tableFile.WriteAllRows(remainingRows); err != nil {
+	if err := tableFile.RewriteFile(remainingRows); err != nil {
 		return "", fmt.Errorf("error saving data after deletion: %s", err)
 	}
 
@@ -67,7 +67,7 @@ func HandleDelete(cmd parser.Command, db *schema.Database) (string, error) {
 }
 
 // Simple WHERE clause evaluation for DELETE
-func evaluateWhereClauseDelete(whereClause string, row []interface{}, columns []schema.Column) bool {
+func evaluateWhereClauseDelete(whereClause string, row storage.Row, columns []schema.Column) bool {
 	// Simple pattern: column = 'value'
 	if strings.Contains(whereClause, "=") {
 		parts := strings.Split(whereClause, "=")
@@ -76,12 +76,12 @@ func evaluateWhereClauseDelete(whereClause string, row []interface{}, columns []
 			val := strings.TrimSpace(parts[1])
 			val = strings.Trim(val, "'\"") // Remove quotes
 
-			// Find column index
-			for i, column := range columns {
+			// Check if row has this column and value matches
+			for _, column := range columns {
 				if strings.EqualFold(column.Name, col) {
-					if i < len(row) {
-						rowVal := fmt.Sprintf("%v", row[i])
-						return strings.EqualFold(rowVal, val)
+					if rowVal, exists := row[col]; exists {
+						rowValStr := fmt.Sprintf("%v", rowVal)
+						return strings.EqualFold(rowValStr, val)
 					}
 					break
 				}
